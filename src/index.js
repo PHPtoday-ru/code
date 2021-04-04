@@ -152,10 +152,7 @@ export default class CodeMirrorTool {
     });
 
     select.onchange = function(e) {
-      this.cm.setOption(
-          'mode',
-          Object.keys(CodeMirrorTool.LANGUAGES).find(key => CodeMirrorTool.LANGUAGES[key] === e.target.value)
-      );
+      this.cm.setOption('mode', e.target.value);
     }.bind(this);
 
     this.nodes.select = select;
