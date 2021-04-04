@@ -1,8 +1,27 @@
 /**
  * Build styles
  */
-import { getLineStartPosition } from './utils/string';
 import './index.css';
+import CodeMirror from 'codemirror';
+import 'codemirror/addon/display/autorefresh';
+import 'codemirror/lib/codemirror.css';
+import 'codemirror/theme/darcula.css';
+import 'codemirror/mode/php/php';
+import 'codemirror/mode/javascript/javascript';
+import 'codemirror/mode/go/go';
+import 'codemirror/mode/sql/sql';
+import 'codemirror/mode/shell/shell';
+import 'codemirror/mode/dockerfile/dockerfile';
+import 'codemirror/mode/htmlmixed/htmlmixed';
+import 'codemirror/mode/css/css';
+import 'codemirror/mode/sass/sass';
+import 'codemirror/mode/markdown/markdown';
+import 'codemirror/mode/smarty/smarty';
+import 'codemirror/mode/twig/twig';
+import 'codemirror/mode/vue/vue';
+import 'codemirror/mode/xml/xml';
+import 'codemirror/mode/yaml/yaml';
+import 'codemirror/mode/protobuf/protobuf';
 
 /**
  * CodeTool for Editor.js
@@ -18,7 +37,7 @@ import './index.css';
 /**
  * Code Tool for the Editor.js allows to include code examples in your articles.
  */
-export default class CodeTool {
+export default class CodeMirrorTool {
 
   /**
    * Notify core that read-only mode is supported
@@ -42,6 +61,7 @@ export default class CodeTool {
   /**
    * @typedef {object} CodeData — plugin saved data
    * @property {string} code - previously saved plugin code
+   * @property {string} language - previously saved code language
    */
 
   /**
@@ -55,24 +75,33 @@ export default class CodeTool {
    */
   constructor({ data, config, api, readOnly }) {
     this.api = api;
-    this.readOnly = readOnly;
 
-    this.placeholder = this.api.i18n.t(config.placeholder || CodeTool.DEFAULT_PLACEHOLDER);
+    this.cmConfig = config.cmConfig || {};
+
+    if (readOnly) {
+      this.cmConfig.readOnly = readOnly;
+    }
+
+    this.cm = null;
 
     this.CSS = {
       baseClass: this.api.styles.block,
       input: this.api.styles.input,
-      wrapper: 'ce-code',
-      textarea: 'ce-code__textarea',
+      wrapper: 'ce-codemirror',
+      editor: 'ce-codemirror__editor',
+      selectWrapper: 'ce-codemirror__language-select-wrapper',
+      select: 'ce-codemirror__language-select',
     };
 
     this.nodes = {
       holder: null,
-      textarea: null,
+      code: null,
+      select: null,
     };
 
     this.data = {
-      code: data.code || '',
+      code: data.code || CodeMirrorTool.DEFAULT_PLACEHOLDER,
+      language: data.language || CodeMirrorTool.DEFAULT_LANGUAGE,
     };
 
     this.nodes.holder = this.drawView();
@@ -86,32 +115,50 @@ export default class CodeTool {
    */
   drawView() {
     const wrapper = document.createElement('div'),
-        textarea = document.createElement('textarea');
+        code = document.createElement('div'),
+        selectWrapper = document.createElement('div');
 
     wrapper.classList.add(this.CSS.baseClass, this.CSS.wrapper);
-    textarea.classList.add(this.CSS.textarea, this.CSS.input);
-    textarea.textContent = this.data.code;
+    code.classList.add(this.CSS.editor);
+    selectWrapper.classList.add(this.CSS.selectWrapper);
 
-    textarea.placeholder = this.placeholder;
+    const select = document.createElement('select');
+    select.classList.add(this.CSS.select);
 
-    if (this.readOnly) {
-      textarea.disabled = true;
+    for (const [k, v] of Object.entries(CodeMirrorTool.LANGUAGES)) {
+      let option = document.createElement('option');
+      let value = document.createAttribute('value');
+      let text = document.createTextNode(k);
+      value.value = v;
+      option.appendChild(text);
+      option.setAttributeNode(value);
+      select.appendChild(option);
     }
 
-    wrapper.appendChild(textarea);
+    select.value = this.data.language;
 
-    /**
-     * Enable keydown handlers
-     */
-    textarea.addEventListener('keydown', (event) => {
-      switch (event.code) {
-        case 'Tab':
-          this.tabHandler(event);
-          break;
+    selectWrapper.appendChild(select);
+    wrapper.appendChild(code);
+    wrapper.appendChild(selectWrapper);
+
+    this.cm = new CodeMirror(code, this.cmConfig);
+    this.cm.setValue(this.data.code);
+
+    this.cm.on('keyHandled', (cm, name, e) => {
+      if (CodeMirrorTool.BLOCKED_EVENTS.indexOf(name) > -1) {
+        e.stopPropagation();
       }
     });
 
-    this.nodes.textarea = textarea;
+    select.onchange = function(e) {
+      this.cm.setOption(
+          'mode',
+          Object.keys(CodeMirrorTool.LANGUAGES).find(key => CodeMirrorTool.LANGUAGES[key] === e.target.value)
+      );
+    }.bind(this);
+
+    this.nodes.select = select;
+    this.nodes.code = code;
 
     return wrapper;
   }
@@ -134,9 +181,10 @@ export default class CodeTool {
    * @public
    */
   save(codeWrapper) {
-    return {
-      code: codeWrapper.querySelector('textarea').value,
-    };
+    return Object.assign(this.data, {
+      code: this.cm.getValue(),
+      language: this.nodes.select.value,
+    });
   }
 
   /**
@@ -169,8 +217,8 @@ export default class CodeTool {
   set data(data) {
     this._data = data;
 
-    if (this.nodes.textarea) {
-      this.nodes.textarea.textContent = data.code;
+    if (this.cm) {
+      this.cm.setValue(data.code);
     }
   }
 
@@ -195,7 +243,36 @@ export default class CodeTool {
    * @returns {string}
    */
   static get DEFAULT_PLACEHOLDER() {
-    return 'Enter a code';
+    return '<?php\n\necho \'hello world!\';';
+  }
+
+  static get DEFAULT_LANGUAGE() {
+    return 'PHP';
+  }
+
+  static get LANGUAGES() {
+    return {
+      'PHP': 'PHP',
+      'JavaScript': 'javascript',
+      'Go': 'go',
+      'SQL': 'sql',
+      'Shell': 'shell',
+      'Dockerfile': 'dockerfile',
+      'HTML': 'htmlmixed',
+      'CSS': 'css',
+      'Sass': 'sass',
+      'Markdown': 'markdown',
+      'Smarty': 'smarty',
+      'Twig': 'twig',
+      'Vue': 'vue',
+      'Xml': 'xml',
+      'Yaml': 'yaml',
+      'Protobuf': 'protobuf',
+    };
+  }
+
+  static get BLOCKED_EVENTS() {
+    return ['Tab', 'Backspace', 'Cmd-Right', 'Cmd-Left', 'Cmd-Up', 'Cmd-Down', 'Up', 'Down', 'Right', 'Left'];
   }
 
   /**
@@ -220,62 +297,5 @@ export default class CodeTool {
     return {
       code: true, // Allow HTML tags
     };
-  }
-
-  /**
-   * Handles Tab key pressing (adds/removes indentations)
-   *
-   * @private
-   * @param {KeyboardEvent} event - keydown
-   * @returns {void}
-   */
-  tabHandler(event) {
-    /**
-     * Prevent editor.js tab handler
-     */
-    event.stopPropagation();
-
-    /**
-     * Prevent native tab behaviour
-     */
-    event.preventDefault();
-
-    const textarea = event.target;
-    const isShiftPressed = event.shiftKey;
-    const caretPosition = textarea.selectionStart;
-    const value = textarea.value;
-    const indentation = '  ';
-
-    let newCaretPosition;
-
-    /**
-     * For Tab pressing, just add an indentation to the caret position
-     */
-    if (!isShiftPressed) {
-      newCaretPosition = caretPosition + indentation.length;
-
-      textarea.value = value.substring(0, caretPosition) + indentation + value.substring(caretPosition);
-    } else {
-      /**
-       * For Shift+Tab pressing, remove an indentation from the start of line
-       */
-      const currentLineStart = getLineStartPosition(value, caretPosition);
-      const firstLineChars = value.substr(currentLineStart, indentation.length);
-
-      if (firstLineChars !== indentation) {
-        return;
-      }
-
-      /**
-       * Trim the first two chars from the start of line
-       */
-      textarea.value = value.substring(0, currentLineStart) + value.substring(currentLineStart + indentation.length);
-      newCaretPosition = caretPosition - indentation.length;
-    }
-
-    /**
-     * Restore the caret
-     */
-    textarea.setSelectionRange(newCaretPosition, newCaretPosition);
   }
 }
