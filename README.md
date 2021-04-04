@@ -11,7 +11,7 @@ CodeMirror Tool for the [Editor.js](https://ifmo.su/editor) allows to include co
 Get the package
 
 ```shell
-npm i --save-dev https://github.com/PHPtoday-ru/editorjs-codemirror:^1.0.0
+npm i --save-dev https://github.com/PHPtoday-ru/editorjs-codemirror#1.0.0
 ```
 
 Include module at your application

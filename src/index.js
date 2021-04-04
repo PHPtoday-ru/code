@@ -143,6 +143,7 @@ export default class CodeMirrorTool {
 
     this.cm = new CodeMirror(code, this.cmConfig);
     this.cm.setValue(this.data.code);
+    this.cm.setOption('mode', this.data.language);
 
     this.cm.on('keyHandled', (cm, name, e) => {
       if (CodeMirrorTool.BLOCKED_EVENTS.indexOf(name) > -1) {
@@ -247,12 +248,12 @@ export default class CodeMirrorTool {
   }
 
   static get DEFAULT_LANGUAGE() {
-    return 'PHP';
+    return 'php';
   }
 
   static get LANGUAGES() {
     return {
-      'PHP': 'PHP',
+      'PHP': 'php',
       'JavaScript': 'javascript',
       'Go': 'go',
       'SQL': 'sql',
