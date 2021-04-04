@@ -76,7 +76,7 @@ export default class CodeMirrorTool {
   constructor({ data, config, api, readOnly }) {
     this.api = api;
 
-    this.cmConfig = config.cmConfig || {};
+    this.cmConfig = Object.assign({}, config.cmConfig || {}, CodeMirrorTool.DEFAULT_CONFIG);
 
     if (readOnly) {
       this.cmConfig.readOnly = readOnly;
@@ -273,6 +273,17 @@ export default class CodeMirrorTool {
 
   static get BLOCKED_EVENTS() {
     return ['Tab', 'Backspace', 'Cmd-Right', 'Cmd-Left', 'Cmd-Up', 'Cmd-Down', 'Up', 'Down', 'Right', 'Left'];
+  }
+
+  static get DEFAULT_CONFIG() {
+    return {
+      lineNumbers: true,
+      mode: 'php',
+      theme: 'darcula',
+      lineWrapping: true,
+      autoRefresh: true,
+      viewportMargin: Infinity,
+    };
   }
 
   /**
